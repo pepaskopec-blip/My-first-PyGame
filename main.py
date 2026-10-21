@@ -40,6 +40,11 @@ enemy_lasers = []
 enemy_laser_speed = 7
 enemy_shoot_timer = 0
 
+# power-upy
+powerups =[]
+powerup_speed = 3
+
+
 # 6. NAČTENÍ OBRÁZKŮ
 player_img = pygame.image.load("player.png").convert_alpha()
 player_img = pygame.transform.scale(player_img, (player_size, player_size))
@@ -82,7 +87,7 @@ meteors = []
 def reset_game():
     """Vrací všechny herní hodnoty do výchozího stavu."""
     global player_x, player_y, meteor_speed, score, lives, lasers, enemy_lasers, meteors
-    global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer
+    global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer, powerups
 
     player_x = 375
     player_y = 500
@@ -96,6 +101,7 @@ def reset_game():
     lives = 3
     lasers = []
     enemy_lasers = []
+    powerups = []
 
     meteors = []
     for i in range(num_meteors):
@@ -170,6 +176,16 @@ while running:
             with open("highscore.txt", "w") as file:
                 file.write(str(highscore))
 
+        # Pohyb a sbírání power-upů
+        for p_up in powerups[:]:
+            p_up.y += powerup_speed
+            if p_up.y > HEIGHT:
+                powerups.remove(p_up)
+            elif player_rect.colliderect(p_up):
+                if lives < 5:
+                    lives += 1
+                powerups.remove(p_up)
+
         # --- NEPŘÍTEL ---
         if enemy_alive:
             # Pohyb ze strany na stranu
@@ -237,7 +253,13 @@ while running:
                 if laser.colliderect(enemy_rect):
                     score += 5
                     enemy_alive = False
-                    enemy_respawn_timer = 180  # Respawn za 3s
+                    enemy_respawn_timer = 180
+
+                    if random.random() < 0.5:
+                        powerups.append(
+                            pygame.Rect(enemy_x + 12,enemy_y, 25, 25)
+                        )
+
                     if laser in lasers:
                         lasers.remove(laser)
                     continue
@@ -292,6 +314,10 @@ while running:
 
         for laser in lasers:
             pygame.draw.rect(screen, (0, 255, 255), laser)
+
+        # Kreslení padajících power-upů
+        for p_up in powerups:
+            screen.blit(life_img, p_up)
 
         score_text = font.render(f"Score: {score}", True, (255, 255, 255))
         high_score_text = font.render(
