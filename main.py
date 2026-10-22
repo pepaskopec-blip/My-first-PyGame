@@ -4,24 +4,24 @@ import pygame
 
 pygame.init()
 
-# 1. NASTAVENÍ OKNA A HODIN
+# 1. Window settings and clock
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Evader")
 clock = pygame.time.Clock()
 
-# 2. PROMĚNNÉ HRÁČE
+# 2. player variables
 player_x = 375
 player_y = 500
 player_size = 50
 player_speed = 5
 
-# 3. METEORITY
+# 3. METEORITES
 meteor_size = 40
 meteor_speed = 4
 num_meteors = 4
 
-# 4. NEPŘÁTELSKÁ LOĎ
+# 4. ENEMY SPACESHIP
 enemy_size = 50
 enemy_x = WIDTH // 2 - enemy_size // 2
 enemy_y = 60
@@ -29,23 +29,25 @@ enemy_speed_x = 3
 enemy_alive = True
 enemy_respawn_timer = 0
 
-# 5. LASERY
+# 5. LASERS
 lasers = []
 laser_speed = 10
 laser_width = 5
 laser_height = 15
 
-# Nepřátelské lasery
+# Enemy lasers
 enemy_lasers = []
 enemy_laser_speed = 7
 enemy_shoot_timer = 0
 
-# power-upy
+# power-ups
 powerups =[]
 powerup_speed = 3
 
+# particles
+particles = []
 
-# 6. NAČTENÍ OBRÁZKŮ
+# 6. image load
 player_img = pygame.image.load("player.png").convert_alpha()
 player_img = pygame.transform.scale(player_img, (player_size, player_size))
 
@@ -63,14 +65,14 @@ enemy_spaceship_img = pygame.transform.scale(
     enemy_spaceship_img, (enemy_size, enemy_size)
 )
 
-# 7. POZADÍ A PÍSMA
+# 7. background and fonts
 bg_y = 0
 bg_speed = 2
 
 font = pygame.font.SysFont("Arial", 30)
 title_font = pygame.font.SysFont("Arial", 50, bold=True)
 
-# 8. NAČTENÍ NEJVYŠŠÍHO SKÓRE
+# 8. high score
 score = 0
 try:
     with open("highscore.txt", "r") as file:
@@ -79,13 +81,25 @@ except (FileNotFoundError, ValueError):
     highscore = 0
 
 lives = 3
-game_state = "MENU"  # Stavy: "MENU", "PLAYING", "GAME_OVER"
+game_state = "MENU"
 
 meteors = []
 
+def create_explosion(x, y, color=(255, 165, 0)):
+    for _ in range (15):
+        particles.append(
+            {
+                "x": x,
+                "y": y,
+                "vx": random.uniform(-4, 4),
+                "vy": random.uniform(-4, 4),
+                "radius": random.randint(3, 6),
+                "color": color,
+                "lifetime": random.randint(15, 25),
+            }
+        )
 
 def reset_game():
-    """Vrací všechny herní hodnoty do výchozího stavu."""
     global player_x, player_y, meteor_speed, score, lives, lasers, enemy_lasers, meteors
     global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer, powerups
 
@@ -110,22 +124,21 @@ def reset_game():
         meteors.append(pygame.Rect(x, y, meteor_size, meteor_size))
 
 
-# 9. HLAVNÍ SMYČKA
+# 9. main loop
 running = True
 while running:
-    # --- A) ODCHYTÁVÁNÍ UDÁLOSTÍ ---
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
         if event.type == pygame.KEYDOWN:
-            # V MENU
+            # in menu
             if game_state == "MENU":
                 if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
                     reset_game()
                     game_state = "PLAYING"
 
-            # V HŘE
+            # in game
             elif game_state == "PLAYING":
                 if event.key == pygame.K_SPACE:
                     laser_x = (
@@ -138,7 +151,7 @@ while running:
                         )
                     )
 
-            # V GAME OVER
+            # in game over
             elif game_state == "GAME_OVER":
                 if event.key == pygame.K_r:
                     reset_game()
@@ -146,14 +159,14 @@ while running:
                 elif event.key == pygame.K_m:
                     game_state = "MENU"
 
-    # --- B) LOGIKA HRY ---
-    # Posun pozadí běží neustále
+    # --- GAME LOGICS ---
+    # Moving background
     bg_y += bg_speed
     if bg_y >= HEIGHT:
         bg_y = 0
 
     if game_state == "PLAYING":
-        # Ovládání (WASD + Šipky)
+        # controls
         keys = pygame.key.get_pressed()
         if (keys[pygame.K_LEFT] or keys[pygame.K_a]) and player_x > 0:
             player_x -= player_speed
@@ -170,13 +183,22 @@ while running:
 
         player_rect = pygame.Rect(player_x, player_y, player_size, player_size)
 
-        # Uložení rekordu
+        # record saving
         if score > highscore:
             highscore = score
             with open("highscore.txt", "w") as file:
                 file.write(str(highscore))
 
-        # Pohyb a sbírání power-upů
+        # movement and particle scaling
+        for p in particles[:]:
+            p["x"] += p["vx"]
+            p["y"] += p["vy"]
+            p["radius"] -= 0.2
+            p["lifetime"] -= 1
+            if p["lifetime"] <= 0 or p["radius"] <= 0:
+                particles.remove(p)
+
+        # movement and powerups
         for p_up in powerups[:]:
             p_up.y += powerup_speed
             if p_up.y > HEIGHT:
@@ -186,14 +208,13 @@ while running:
                     lives += 1
                 powerups.remove(p_up)
 
-        # --- NEPŘÍTEL ---
+        # --- ENEMY ---
         if enemy_alive:
-            # Pohyb ze strany na stranu
             enemy_x += enemy_speed_x
             if enemy_x <= 0 or enemy_x >= WIDTH - enemy_size:
                 enemy_speed_x *= -1
 
-            # Střílení nepřítele směrem dolů
+            # Shooting the enemy
             enemy_shoot_timer += 1
             if enemy_shoot_timer >= 60:
                 enemy_shoot_timer = 0
@@ -202,19 +223,17 @@ while running:
                     pygame.Rect(e_laser_x, enemy_y + enemy_size, 5, 15)
                 )
         else:
-            # Odpočítávání do nového respawnu (3 sekundy = 180 snímků)
             enemy_respawn_timer -= 1
             if enemy_respawn_timer <= 0:
                 enemy_x = random.randint(0, WIDTH - enemy_size)
                 enemy_alive = True
 
-        # Pohyb nepřátelských laserů dolů
+        # Movement of enemy lasers
         for e_laser in enemy_lasers[:]:
             e_laser.y += enemy_laser_speed
             if e_laser.y > HEIGHT:
                 enemy_lasers.remove(e_laser)
 
-        # Zásah hráče nepřátelským laserem
         for e_laser in enemy_lasers[:]:
             if player_rect.colliderect(e_laser):
                 lives -= 1
@@ -222,7 +241,7 @@ while running:
                 if lives <= 0:
                     game_state = "GAME_OVER"
 
-        # --- METEORITY ---
+        # --- METEORITES ---
         for meteor in meteors:
             meteor.y += meteor_speed
 
@@ -238,14 +257,14 @@ while running:
                 if lives <= 0:
                     game_state = "GAME_OVER"
 
-        # --- HRÁČOVY LASERY & KOLIZE ---
+        # --- PLAYERS LASERS AND COLLISION ---
         for laser in lasers[:]:
             laser.y -= laser_speed
             if laser.y < -laser_height:
                 lasers.remove(laser)
 
         for laser in lasers[:]:
-            # 1. Zásah nepřítele
+            # 1. Enemy hit
             if enemy_alive:
                 enemy_rect = pygame.Rect(
                     enemy_x, enemy_y, enemy_size, enemy_size
@@ -254,6 +273,9 @@ while running:
                     score += 5
                     enemy_alive = False
                     enemy_respawn_timer = 180
+                    create_explosion(
+                        enemy_x + enemy_size // 2, enemy_y + enemy_size // 2, (255, 50, 50)
+                    )
 
                     if random.random() < 0.5:
                         powerups.append(
@@ -264,11 +286,17 @@ while running:
                         lasers.remove(laser)
                     continue
 
-            # 2. Zásah meteoritů
+            # 2. Meteorite hit
             for meteor in meteors:
                 if laser.colliderect(meteor):
                     score += 1
                     meteor_speed += 0.05
+
+                    create_explosion(
+                        meteor.x + meteor_size // 2,
+                        meteor.y + meteor_size // 2,
+                        (255, 165, 0)
+                    )
 
                     meteor.y = -meteor_size
                     meteor.x = random.randint(0, WIDTH - meteor_size)
@@ -277,8 +305,8 @@ while running:
                         lasers.remove(laser)
                     break
 
-    # --- C) VYKRESLOVÁNÍ ---
-    # Posouvající se pozadí
+    # --- C) RENDERING ---
+    # Moving background
     screen.blit(bg_img, (0, bg_y))
     screen.blit(bg_img, (0, bg_y - HEIGHT))
 
@@ -315,7 +343,7 @@ while running:
         for laser in lasers:
             pygame.draw.rect(screen, (0, 255, 255), laser)
 
-        # Kreslení padajících power-upů
+        # Power-ups rendering
         for p_up in powerups:
             screen.blit(life_img, p_up)
 
@@ -323,6 +351,11 @@ while running:
         high_score_text = font.render(
             f"High Score: {highscore}", True, (255, 215, 0)
         )
+
+        for p in particles:
+            pygame.draw.circle(
+                screen, p["color"], (int(p["x"]), int(p["y"])), int(p["radius"])
+            )
 
         screen.blit(score_text, (10, 10))
         screen.blit(high_score_text, (10, 45))
