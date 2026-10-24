@@ -57,6 +57,9 @@ meteor_img = pygame.transform.scale(meteor_img, (meteor_size, meteor_size))
 life_img = pygame.image.load("life.png").convert_alpha()
 life_img = pygame.transform.scale(life_img, (25, 25))
 
+coin_img = pygame.image.load("coin.png").convert_alpha()
+coin_img = pygame.transform.scale(coin_img, (25, 25))
+
 default_background = pygame.image.load("default_background.jpg").convert()
 bg_img = pygame.transform.scale(default_background, (WIDTH, HEIGHT))
 
@@ -83,7 +86,7 @@ except (FileNotFoundError, ValueError):
 # coins
 coins = 0
 try:
-    with open ("coins.txt", "r") as file:
+    with open("coins.txt", "r") as file:
         coins = int(file.read())
 except (FileNotFoundError, ValueError):
     coins = 0
@@ -97,9 +100,11 @@ def save_highscore(val):
     with open("highscore.txt", "w") as file:
         file.write(str(val))
 
+
 def save_coins(val):
     with open("coins.txt", "w") as file:
         file.write(str(val))
+
 
 def create_explosion(x, y, color=(255, 165, 0)):
     for _ in range(15):
@@ -114,6 +119,17 @@ def create_explosion(x, y, color=(255, 165, 0)):
                 "lifetime": random.randint(15, 25),
             }
         )
+
+
+def draw_coins(x, y, center=False):
+    """Vykreslí ikonku coinu a vedle ní počet coinů."""
+    text = font.render(str(coins), True, (255, 215, 0))
+    total_width = coin_img.get_width() + 8 + text.get_width()
+    if center:
+        x = x - total_width // 2
+    icon_y = y + (text.get_height() - coin_img.get_height()) // 2
+    screen.blit(coin_img, (x, icon_y))
+    screen.blit(text, (x + coin_img.get_width() + 8, y))
 
 
 def reset_game():
@@ -339,10 +355,6 @@ while running:
             f"High Score: {highscore}", True, (255, 215, 0)
         )
 
-        coins_text = font.render(
-            f"Coins: {coins}" , True, (255, 215, 0)
-        )
-
         screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 180))
         screen.blit(
             start_text, (WIDTH // 2 - start_text.get_width() // 2, 300)
@@ -351,10 +363,7 @@ while running:
             high_score_text,
             (WIDTH // 2 - high_score_text.get_width() // 2, 380),
         )
-        screen.blit(
-            coins_text,
-            (WIDTH // 2 - coins_text.get_width() // 2, 460),
-        )
+        draw_coins(WIDTH // 2, 460, center=True)
 
     elif game_state == "PLAYING":
         screen.blit(player_img, (player_x, player_y))
@@ -384,11 +393,9 @@ while running:
             f"High Score: {highscore}", True, (255, 215, 0)
         )
 
-        coins_text = font.render(f"Coins: {coins}", True, (255, 255, 255))
-
         screen.blit(score_text, (10, 10))
         screen.blit(high_score_text, (10, 45))
-        screen.blit(coins_text, (10, 80))
+        draw_coins(10, 80)
 
         for i in range(lives):
             screen.blit(life_img, (WIDTH - 35 - (i * 30), 15))
@@ -401,7 +408,6 @@ while running:
 
         game_over_text = title_font.render("GAME OVER", True, (255, 50, 50))
         score_text = font.render(f"Score: {score}", True, (255, 255, 255))
-        coins_text = font.render(f"Coins: {coins}", True, (255, 255, 255))
         high_score_text = font.render(
             f"High Score: {highscore}", True, (255, 215, 0)
         )
@@ -413,13 +419,13 @@ while running:
             game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, 150)
         )
         screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, 240))
-        screen.blit(coins_text, (WIDTH // 2 - coins_text.get_width() // 2, 320))
         screen.blit(
             high_score_text,
             (WIDTH // 2 - high_score_text.get_width() // 2, 280),
         )
+        draw_coins(WIDTH // 2, 320, center=True)
         screen.blit(
-            restart_text, (WIDTH // 2 - restart_text.get_width() // 2, 360)
+            restart_text, (WIDTH // 2 - restart_text.get_width() // 2, 380)
         )
 
     pygame.display.flip()
