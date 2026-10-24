@@ -41,7 +41,7 @@ enemy_laser_speed = 7
 enemy_shoot_timer = 0
 
 # power-ups
-powerups =[]
+powerups = []
 powerup_speed = 3
 
 # particles
@@ -80,13 +80,29 @@ try:
 except (FileNotFoundError, ValueError):
     highscore = 0
 
+# coins
+coins = 0
+try:
+    with open ("coins.txt", "r") as file:
+        coins = int(file.read())
+except (FileNotFoundError, ValueError):
+    coins = 0
+
 lives = 3
 game_state = "MENU"
-
 meteors = []
 
+
+def save_highscore(val):
+    with open("highscore.txt", "w") as file:
+        file.write(str(val))
+
+def save_coins(val):
+    with open("coins.txt", "w") as file:
+        file.write(str(val))
+
 def create_explosion(x, y, color=(255, 165, 0)):
-    for _ in range (15):
+    for _ in range(15):
         particles.append(
             {
                 "x": x,
@@ -99,9 +115,11 @@ def create_explosion(x, y, color=(255, 165, 0)):
             }
         )
 
+
 def reset_game():
     global player_x, player_y, meteor_speed, score, lives, lasers, enemy_lasers, meteors
     global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer, powerups
+    global particles
 
     player_x = 375
     player_y = 500
@@ -116,6 +134,7 @@ def reset_game():
     lasers = []
     enemy_lasers = []
     powerups = []
+    particles = []
 
     meteors = []
     for i in range(num_meteors):
@@ -132,13 +151,11 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN:
-            # in menu
             if game_state == "MENU":
                 if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
                     reset_game()
                     game_state = "PLAYING"
 
-            # in game
             elif game_state == "PLAYING":
                 if event.key == pygame.K_SPACE:
                     laser_x = (
@@ -151,7 +168,6 @@ while running:
                         )
                     )
 
-            # in game over
             elif game_state == "GAME_OVER":
                 if event.key == pygame.K_r:
                     reset_game()
@@ -159,14 +175,20 @@ while running:
                 elif event.key == pygame.K_m:
                     game_state = "MENU"
 
-    # --- GAME LOGICS ---
-    # Moving background
+    # --- GAME LOGIC ---
     bg_y += bg_speed
     if bg_y >= HEIGHT:
         bg_y = 0
 
+    for p in particles[:]:
+        p["x"] += p["vx"]
+        p["y"] += p["vy"]
+        p["radius"] -= 0.2
+        p["lifetime"] -= 1
+        if p["lifetime"] <= 0 or p["radius"] <= 0:
+            particles.remove(p)
+
     if game_state == "PLAYING":
-        # controls
         keys = pygame.key.get_pressed()
         if (keys[pygame.K_LEFT] or keys[pygame.K_a]) and player_x > 0:
             player_x -= player_speed
@@ -183,22 +205,10 @@ while running:
 
         player_rect = pygame.Rect(player_x, player_y, player_size, player_size)
 
-        # record saving
         if score > highscore:
             highscore = score
-            with open("highscore.txt", "w") as file:
-                file.write(str(highscore))
 
-        # movement and particle scaling
-        for p in particles[:]:
-            p["x"] += p["vx"]
-            p["y"] += p["vy"]
-            p["radius"] -= 0.2
-            p["lifetime"] -= 1
-            if p["lifetime"] <= 0 or p["radius"] <= 0:
-                particles.remove(p)
-
-        # movement and powerups
+        # Power-ups
         for p_up in powerups[:]:
             p_up.y += powerup_speed
             if p_up.y > HEIGHT:
@@ -208,13 +218,12 @@ while running:
                     lives += 1
                 powerups.remove(p_up)
 
-        # --- ENEMY ---
+        # Enemy
         if enemy_alive:
             enemy_x += enemy_speed_x
             if enemy_x <= 0 or enemy_x >= WIDTH - enemy_size:
                 enemy_speed_x *= -1
 
-            # Shooting the enemy
             enemy_shoot_timer += 1
             if enemy_shoot_timer >= 60:
                 enemy_shoot_timer = 0
@@ -228,20 +237,25 @@ while running:
                 enemy_x = random.randint(0, WIDTH - enemy_size)
                 enemy_alive = True
 
-        # Movement of enemy lasers
+        # Enemy lasers
         for e_laser in enemy_lasers[:]:
             e_laser.y += enemy_laser_speed
             if e_laser.y > HEIGHT:
                 enemy_lasers.remove(e_laser)
-
-        for e_laser in enemy_lasers[:]:
-            if player_rect.colliderect(e_laser):
+            elif player_rect.colliderect(e_laser):
                 lives -= 1
                 enemy_lasers.remove(e_laser)
+                create_explosion(
+                    player_x + player_size // 2,
+                    player_y + player_size // 2,
+                    (255, 0, 0),
+                )
                 if lives <= 0:
                     game_state = "GAME_OVER"
+                    save_highscore(highscore)
+                    save_coins(coins)
 
-        # --- METEORITES ---
+        # Meteors
         for meteor in meteors:
             meteor.y += meteor_speed
 
@@ -251,62 +265,68 @@ while running:
 
             if player_rect.colliderect(meteor):
                 lives -= 1
+                create_explosion(
+                    player_x + player_size // 2,
+                    player_y + player_size // 2,
+                    (255, 0, 0),
+                )
                 meteor.y = -meteor_size
                 meteor.x = random.randint(0, WIDTH - meteor_size)
 
                 if lives <= 0:
                     game_state = "GAME_OVER"
+                    save_highscore(highscore)
+                    save_coins(coins)
 
-        # --- PLAYERS LASERS AND COLLISION ---
+        # Player lasers
         for laser in lasers[:]:
             laser.y -= laser_speed
             if laser.y < -laser_height:
                 lasers.remove(laser)
+                continue
 
-        for laser in lasers[:]:
-            # 1. Enemy hit
+            # Enemy hit
             if enemy_alive:
                 enemy_rect = pygame.Rect(
                     enemy_x, enemy_y, enemy_size, enemy_size
                 )
                 if laser.colliderect(enemy_rect):
                     score += 5
+                    coins += 3
                     enemy_alive = False
                     enemy_respawn_timer = 180
                     create_explosion(
-                        enemy_x + enemy_size // 2, enemy_y + enemy_size // 2, (255, 50, 50)
+                        enemy_x + enemy_size // 2,
+                        enemy_y + enemy_size // 2,
+                        (255, 50, 50),
                     )
 
                     if random.random() < 0.5:
                         powerups.append(
-                            pygame.Rect(enemy_x + 12,enemy_y, 25, 25)
+                            pygame.Rect(enemy_x + 12, enemy_y, 25, 25)
                         )
 
-                    if laser in lasers:
-                        lasers.remove(laser)
+                    lasers.remove(laser)
                     continue
 
-            # 2. Meteorite hit
+            # Meteor hit
             for meteor in meteors:
                 if laser.colliderect(meteor):
                     score += 1
+                    coins += 1
                     meteor_speed += 0.05
-
                     create_explosion(
                         meteor.x + meteor_size // 2,
                         meteor.y + meteor_size // 2,
-                        (255, 165, 0)
+                        (255, 165, 0),
                     )
-
                     meteor.y = -meteor_size
                     meteor.x = random.randint(0, WIDTH - meteor_size)
-
                     if laser in lasers:
                         lasers.remove(laser)
                     break
 
-    # --- C) RENDERING ---
-    # Moving background
+    # --- RENDERING ---
     screen.blit(bg_img, (0, bg_y))
     screen.blit(bg_img, (0, bg_y - HEIGHT))
 
@@ -319,6 +339,10 @@ while running:
             f"High Score: {highscore}", True, (255, 215, 0)
         )
 
+        coins_text = font.render(
+            f"Coins: {coins}" , True, (255, 215, 0)
+        )
+
         screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 180))
         screen.blit(
             start_text, (WIDTH // 2 - start_text.get_width() // 2, 300)
@@ -326,6 +350,10 @@ while running:
         screen.blit(
             high_score_text,
             (WIDTH // 2 - high_score_text.get_width() // 2, 380),
+        )
+        screen.blit(
+            coins_text,
+            (WIDTH // 2 - coins_text.get_width() // 2, 460),
         )
 
     elif game_state == "PLAYING":
@@ -343,29 +371,37 @@ while running:
         for laser in lasers:
             pygame.draw.rect(screen, (0, 255, 255), laser)
 
-        # Power-ups rendering
         for p_up in powerups:
             screen.blit(life_img, p_up)
-
-        score_text = font.render(f"Score: {score}", True, (255, 255, 255))
-        high_score_text = font.render(
-            f"High Score: {highscore}", True, (255, 215, 0)
-        )
 
         for p in particles:
             pygame.draw.circle(
                 screen, p["color"], (int(p["x"]), int(p["y"])), int(p["radius"])
             )
 
+        score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+        high_score_text = font.render(
+            f"High Score: {highscore}", True, (255, 215, 0)
+        )
+
+        coins_text = font.render(f"Coins: {coins}", True, (255, 255, 255))
+
         screen.blit(score_text, (10, 10))
         screen.blit(high_score_text, (10, 45))
+        screen.blit(coins_text, (10, 80))
 
         for i in range(lives):
             screen.blit(life_img, (WIDTH - 35 - (i * 30), 15))
 
     elif game_state == "GAME_OVER":
+        for p in particles:
+            pygame.draw.circle(
+                screen, p["color"], (int(p["x"]), int(p["y"])), int(p["radius"])
+            )
+
         game_over_text = title_font.render("GAME OVER", True, (255, 50, 50))
         score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+        coins_text = font.render(f"Coins: {coins}", True, (255, 255, 255))
         high_score_text = font.render(
             f"High Score: {highscore}", True, (255, 215, 0)
         )
@@ -377,6 +413,7 @@ while running:
             game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, 150)
         )
         screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, 240))
+        screen.blit(coins_text, (WIDTH // 2 - coins_text.get_width() // 2, 320))
         screen.blit(
             high_score_text,
             (WIDTH // 2 - high_score_text.get_width() // 2, 280),
