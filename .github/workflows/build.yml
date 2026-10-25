@@ -13,20 +13,17 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: SpaceEvader-Windows.exe
-            asset_name: SpaceEvader-Windows.exe
+            asset_name: dist/SpaceEvader-Windows.exe
             command: pyinstaller --noconsole --onefile --add-data "*.png;." --add-data "*.jpg;." --name "SpaceEvader-Windows" main.py
 
           - os: macos-latest
-            artifact_name: dist/SpaceEvader-macOS.zip
-            asset_name: SpaceEvader-macOS.zip
+            asset_name: dist/SpaceEvader-macOS.zip
             command: |
               pyinstaller --noconsole --collect-all pygame --add-data "*.png:." --add-data "*.jpg:." --name "SpaceEvader-macOS" main.py
               cd dist && zip -r SpaceEvader-macOS.zip main.app || zip -r SpaceEvader-macOS.zip SpaceEvader-macOS
 
           - os: ubuntu-latest
-            artifact_name: dist/SpaceEvader-Linux.tar.gz
-            asset_name: SpaceEvader-Linux.tar.gz
+            asset_name: dist/SpaceEvader-Linux.tar.gz
             command: |
               pyinstaller --noconsole --onefile --add-data "*.png:." --add-data "*.jpg:." --name "SpaceEvader-Linux" main.py
               cd dist && tar -czvf SpaceEvader-Linux.tar.gz SpaceEvader-Linux
