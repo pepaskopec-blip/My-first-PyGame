@@ -1,5 +1,7 @@
 import random
 import sys
+from bdb import effective
+
 import pygame
 
 pygame.init()
@@ -34,6 +36,8 @@ lasers = []
 laser_speed = 10
 laser_width = 5
 laser_height = 15
+shoot_cooldown = 0
+RAPID_FIRE_DELAY = 8
 
 # Enemy lasers
 enemy_lasers = []
@@ -43,6 +47,16 @@ enemy_shoot_timer = 0
 # power-ups
 powerups = []
 powerup_speed = 3
+POWERUP_TYPES = ["life", "shield", "rapid", "double"]
+POWERUP_DURATION = 600
+POWERUP_COLORS = {
+    "shield": ((0, 150, 255), "S"),
+    "rapid": ((255, 140, 0), "R"),
+}
+
+shield_timer = 0
+rapid_timer = 0
+double_timer = 0
 
 # particles
 particles = []
@@ -73,6 +87,7 @@ bg_y = 0
 bg_speed = 2
 
 font = pygame.font.SysFont("Arial", 30)
+small_font = pygame.font.SysFont("Arial", 20, bold=True)
 title_font = pygame.font.SysFont("Arial", 50, bold=True)
 
 # 8. high score
@@ -122,7 +137,6 @@ def create_explosion(x, y, color=(255, 165, 0)):
 
 
 def draw_coins(x, y, center=False):
-    """Vykreslí ikonku coinu a vedle ní počet coinů."""
     text = font.render(str(coins), True, (255, 215, 0))
     total_width = coin_img.get_width() + 8 + text.get_width()
     if center:
@@ -131,11 +145,56 @@ def draw_coins(x, y, center=False):
     screen.blit(coin_img, (x, icon_y))
     screen.blit(text, (x + coin_img.get_width() + 8, y))
 
+def fire_laser():
+    laser_x = player_x + (player_size // 2) - (laser_width // 2)
+    lasers.append(pygame.Rect(laser_x, player_y, laser_width, laser_height))
+
+def damage_player():
+    global lives, game_state
+    cx = player_x + player_size // 2
+    cy = player_y + player_size // 2
+
+    if shield_timer > 0:
+        create_explosion(cx, cy, (0, 150, 255))
+        return
+
+    lives -= 1
+    create_explosion(cx, cy, (255, 0, 0))
+    if lives <= 0:
+        game_state = "GAME OVER"
+        save_highscore(highscore)
+        save_coins(coins)
+
+def apply_powerup(kind):
+    global lives, shield_timer, rapid_timer, double_timer
+    if kind == "life":
+        if lives < 5:
+            lives += 1
+    elif kind == "shield":
+        shield_timer = POWERUP_DURATION
+    elif kind == "rapid":
+        rapid_timer = POWERUP_DURATION
+    elif kind == "double":
+        double_timer = POWERUP_DURATION
+
+def draw_powerup(p_up):
+    rect = p_up["rect"]
+    kind = p_up["type"]
+    if kind == "life":
+        screen.blit(life_img, rect)
+    elif kind == "double":
+        screen.blit(coin_img, rect)
+    else:
+        color, letter = POWERUP_COLORS[kind]
+        pygame.draw.circle(screen, color, rect.center, 13)
+        pygame.draw.circle(screen, (255, 255, 255), rect.center, 13, 2)
+        label = small_font.render(letter, True, (255, 255, 255))
+        screen.blit(label, label.get_rect(center=rect.center))
 
 def reset_game():
     global player_x, player_y, meteor_speed, score, lives, lasers, enemy_lasers, meteors
     global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer, powerups
-    global particles
+    global particles, shield_timer, rapid_timer, double_timer, shoot_cooldown
 
     player_x = 375
     player_y = 500
@@ -151,6 +210,10 @@ def reset_game():
     enemy_lasers = []
     powerups = []
     particles = []
+    shield_timer = 0
+    rapid_timer = 0
+    double_timer = 0
+    shoot_cooldown = 0
 
     meteors = []
     for i in range(num_meteors):
@@ -174,15 +237,8 @@ while running:
 
             elif game_state == "PLAYING":
                 if event.key == pygame.K_SPACE:
-                    laser_x = (
-                        player_x + (player_size // 2) - (laser_width // 2)
-                    )
-                    laser_y = player_y
-                    lasers.append(
-                        pygame.Rect(
-                            laser_x, laser_y, laser_width, laser_height
-                        )
-                    )
+                    fire_laser()
+                    shoot_cooldown = RAPID_FIRE_DELAY
 
             elif game_state == "GAME_OVER":
                 if event.key == pygame.K_r:
@@ -225,13 +281,29 @@ while running:
             highscore = score
 
         # Power-ups
+        if shield_timer > 0:
+            shield_timer -= 1
+        if rapid_timer > 0:
+            rapid_timer -= 1
+        if double_timer > 0:
+            double_timer -= 1
+        if shoot_cooldown > 0:
+            shoot_cooldown -= 1
+
+        # Rapid fire: holding space
+        if rapid_timer > 0 and keys[pygame.K_SPACE] and shoot_cooldown <= 0:
+            fire_laser()
+            shoot_cooldown = RAPID_FIRE_DELAY
+
+        coin_mult = 2 if double_timer > 0 else 1
+
+        # Power-ups
         for p_up in powerups[:]:
-            p_up.y += powerup_speed
-            if p_up.y > HEIGHT:
+            p_up["rect"].y += powerup_speed
+            if p_up["rect"].y > HEIGHT:
                 powerups.remove(p_up)
-            elif player_rect.colliderect(p_up):
-                if lives < 5:
-                    lives += 1
+            elif player_rect.colliderect(p_up["rect"]):
+                apply_powerup(p_up["type"])
                 powerups.remove(p_up)
 
         # Enemy
@@ -259,17 +331,8 @@ while running:
             if e_laser.y > HEIGHT:
                 enemy_lasers.remove(e_laser)
             elif player_rect.colliderect(e_laser):
-                lives -= 1
                 enemy_lasers.remove(e_laser)
-                create_explosion(
-                    player_x + player_size // 2,
-                    player_y + player_size // 2,
-                    (255, 0, 0),
-                )
-                if lives <= 0:
-                    game_state = "GAME_OVER"
-                    save_highscore(highscore)
-                    save_coins(coins)
+                damage_player()
 
         # Meteors
         for meteor in meteors:
@@ -280,19 +343,9 @@ while running:
                 meteor.x = random.randint(0, WIDTH - meteor_size)
 
             if player_rect.colliderect(meteor):
-                lives -= 1
-                create_explosion(
-                    player_x + player_size // 2,
-                    player_y + player_size // 2,
-                    (255, 0, 0),
-                )
                 meteor.y = -meteor_size
                 meteor.x = random.randint(0, WIDTH - meteor_size)
-
-                if lives <= 0:
-                    game_state = "GAME_OVER"
-                    save_highscore(highscore)
-                    save_coins(coins)
+                damage_player()
 
         # Player lasers
         for laser in lasers[:]:
@@ -308,7 +361,7 @@ while running:
                 )
                 if laser.colliderect(enemy_rect):
                     score += 5
-                    coins += 3
+                    coins += 3 * coin_mult
                     enemy_alive = False
                     enemy_respawn_timer = 180
                     create_explosion(
@@ -319,7 +372,10 @@ while running:
 
                     if random.random() < 0.5:
                         powerups.append(
-                            pygame.Rect(enemy_x + 12, enemy_y, 25, 25)
+                            {
+                                "rect": pygame.Rect(enemy_x + 12, enemy_y, 25, 25),
+                                "type": random.choice(POWERUP_TYPES),
+                            }
                         )
 
                     lasers.remove(laser)
@@ -329,7 +385,7 @@ while running:
             for meteor in meteors:
                 if laser.colliderect(meteor):
                     score += 1
-                    coins += 1
+                    coins += 1 * coin_mult
                     meteor_speed += 0.05
                     create_explosion(
                         meteor.x + meteor_size // 2,
@@ -368,6 +424,15 @@ while running:
     elif game_state == "PLAYING":
         screen.blit(player_img, (player_x, player_y))
 
+        if shield_timer > 0 and (shield_timer > 120 or (shield_timer //6) % 2 == 0):
+            pygame.draw.circle(
+                screen,
+                (0, 150, 255),
+                (player_x + player_size // 2, player_y + player_size // 2),
+                player_size // 2 + 8,
+                3,
+            )
+
         for meteor in meteors:
             screen.blit(meteor_img, meteor)
 
@@ -381,7 +446,7 @@ while running:
             pygame.draw.rect(screen, (0, 255, 255), laser)
 
         for p_up in powerups:
-            screen.blit(life_img, p_up)
+            draw_powerup(p_up)
 
         for p in particles:
             pygame.draw.circle(
@@ -396,6 +461,20 @@ while running:
         screen.blit(score_text, (10, 10))
         screen.blit(high_score_text, (10, 45))
         draw_coins(10, 80)
+
+        effects = [
+            ("Shield", shield_timer, (0, 150, 255)),
+            ("Rapid fire", rapid_timer, (255, 140, 0)),
+            (" 2x coins", double_timer, (255, 215, 0)),
+        ]
+        effect_y = 120
+        for name, timer, color in effects:
+            if timer > 0:
+                effect_text = small_font.render(
+                    f"{name}: {timer // 60 + 1}s", True, color
+                )
+                screen.blit(effect_text, (10, effect_y))
+                effect_y += 24
 
         for i in range(lives):
             screen.blit(life_img, (WIDTH - 35 - (i * 30), 15))
