@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Game save data
+shop.json
+coins.txt
+highscore.txt
+
+# macOS
+.DS_Store
+
+# PyCharm settings
+.idea/
