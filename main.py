@@ -465,7 +465,7 @@ while running:
         effects = [
             ("Shield", shield_timer, (0, 150, 255)),
             ("Rapid fire", rapid_timer, (255, 140, 0)),
-            (" 2x coins", double_timer, (255, 215, 0)),
+            ("2x coins", double_timer, (255, 215, 0)),
         ]
         effect_y = 120
         for name, timer, color in effects:
