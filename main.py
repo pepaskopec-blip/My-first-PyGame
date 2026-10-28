@@ -349,6 +349,31 @@ def draw_shop():
     screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, 550))
 
 
+# MENU BUTTONS
+menu_buttons = [
+    {"label": "PLAY", "action": "play", "rect": pygame.Rect(WIDTH // 2 - 130, 310, 260, 55)},
+    {"label": "SHOP", "action": "shop", "rect": pygame.Rect(WIDTH // 2 - 130, 380, 260, 55)},
+    {"label": "QUIT", "action": "quit", "rect": pygame.Rect(WIDTH // 2 - 130, 450, 260, 55)},
+]
+
+
+def draw_button(button):
+    rect = button["rect"]
+    hovered = rect.collidepoint(pygame.mouse.get_pos())
+
+    fill = (0, 110, 140, 230) if hovered else (20, 30, 60, 200)
+    border = (0, 255, 255) if hovered else (90, 140, 180)
+
+    # průhledná výplň: kreslí se na surface s alfa kanálem
+    panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(panel, fill, panel.get_rect(), border_radius=12)
+    screen.blit(panel, rect)
+    pygame.draw.rect(screen, border, rect, 3, border_radius=12)
+
+    text = font.render(button["label"], True, (255, 255, 255))
+    screen.blit(text, text.get_rect(center=rect.center))
+
+
 def reset_game():
     global player_x, player_y, meteor_speed, score, lives, lasers, enemy_lasers, meteors
     global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer, powerups
@@ -389,6 +414,19 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
+        # klikání myší v menu
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if game_state == "MENU":
+                for button in menu_buttons:
+                    if button["rect"].collidepoint(event.pos):
+                        if button["action"] == "play":
+                            reset_game()
+                            game_state = "PLAYING"
+                        elif button["action"] == "shop":
+                            game_state = "SHOP"
+                        elif button["action"] == "quit":
+                            running = False
 
         if event.type == pygame.KEYDOWN:
             if game_state == "MENU":
@@ -438,13 +476,13 @@ while running:
         if (keys[pygame.K_LEFT] or keys[pygame.K_a]) and player_x > 0:
             player_x -= player_speed
         if (
-            keys[pygame.K_RIGHT] or keys[pygame.K_d]
+                keys[pygame.K_RIGHT] or keys[pygame.K_d]
         ) and player_x < WIDTH - player_size:
             player_x += player_speed
         if (keys[pygame.K_UP] or keys[pygame.K_w]) and player_y > 0:
             player_y -= player_speed
         if (
-            keys[pygame.K_DOWN] or keys[pygame.K_s]
+                keys[pygame.K_DOWN] or keys[pygame.K_s]
         ) and player_y < HEIGHT - player_size:
             player_y += player_speed
 
@@ -580,27 +618,30 @@ while running:
     screen.blit(bg_img, (0, bg_y - HEIGHT))
 
     if game_state == "MENU":
+        screen.blit(menu_overlay, (0, 0))
+
         title_text = title_font.render("SPACE EVADER", True, (0, 255, 255))
-        start_text = font.render(
-            "Press SPACE or ENTER to Start", True, (255, 255, 255)
-        )
-        shop_text = font.render("Press S for Shop", True, (255, 255, 255))
+        title_shadow = title_font.render("SPACE EVADER", True, (0, 60, 80))
         high_score_text = font.render(
             f"High Score: {highscore}", True, (255, 215, 0)
         )
 
-        screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 180))
-        screen.blit(
-            start_text, (WIDTH // 2 - start_text.get_width() // 2, 300)
-        )
-        screen.blit(
-            shop_text, (WIDTH // 2 - shop_text.get_width() // 2, 340)
-        )
+        title_x = WIDTH // 2 - title_text.get_width() // 2
+        screen.blit(title_shadow, (title_x + 3, 113))
+        screen.blit(title_text, (title_x, 110))
         screen.blit(
             high_score_text,
-            (WIDTH // 2 - high_score_text.get_width() // 2, 380),
+            (WIDTH // 2 - high_score_text.get_width() // 2, 195),
         )
-        draw_coins(WIDTH // 2, 460, center=True)
+        draw_coins(WIDTH // 2, 240, center=True)
+
+        for button in menu_buttons:
+            draw_button(button)
+
+        hint = small_font.render(
+            "SPACE / ENTER = play   |   S = shop", True, (200, 200, 200)
+        )
+        screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, 550))
 
     elif game_state == "SHOP":
         draw_shop()
