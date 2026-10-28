@@ -156,6 +156,8 @@ game_state = "MENU"
 meteors = []
 
 shop_index = 0
+shop_message = ""
+shop_message_until = 0
 
 
 def save_highscore(val):
@@ -281,25 +283,37 @@ def shop_items():
 
 
 def shop_action(index):
-    global coins
+    global coins, shop_message, shop_message_until
     kind, i = shop_items()[index]
+    message = ""
 
     if kind == "skin":
         skin = SKINS[i]
         if i in shop["owned_skins"]:
             shop["selected_skin"] = i
+            message = "Equipped"
         elif coins >= skin["price"]:
             coins -= skin["price"]
             shop["owned_skins"].append(i)
             shop["selected_skin"] = i
+            message = "Bought and equipped!"
+        else:
+            message = "Not enough coins"
     else:
         upg = UPGRADES[i]
         level = upgrade_level(upg["id"])
         price = upgrade_price(upg)
-        if level < upg["max_level"] and coins >= price:
+        if level >= upg["max_level"]:
+            message = "Already at max level"
+        elif coins >= price:
             coins -= price
             shop["upgrades"][upg["id"]] = level + 1
+            message = "Upgraded!"
+        else:
+            message = "Not enough coins"
 
+    shop_message = message
+    shop_message_until = pygame.time.get_ticks() + 1500
     save_coins(coins)
     save_shop()
 
@@ -310,6 +324,10 @@ def draw_shop():
     title = title_font.render("SHOP", True, (0, 255, 255))
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 30))
     draw_coins(WIDTH // 2, 100, center=True)
+
+    if pygame.time.get_ticks() > shop_message_until:
+        msg = small_font.render(shop_message, True, (255, 215, 0))
+        screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 138))
 
     y = 170
     for index, (kind, i) in enumerate(shop_items()):
@@ -343,10 +361,12 @@ def draw_shop():
             pygame.draw.rect(screen, color, (95, y - 8, WIDTH - 190, 46), 2)
         y += 55
 
+    draw_button(back_button)
+
     hint = small_font.render(
-        "UP/DOWN select  |  ENTER buy / equip  |  ESC back", True, (200, 200, 200)
+        "CLICK or ENTER = buy / equip   |   ESC = back", True, (200, 200, 200)
     )
-    screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, 550))
+    screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, 552))
 
 
 # MENU BUTTONS
@@ -364,7 +384,6 @@ def draw_button(button):
     fill = (0, 110, 140, 230) if hovered else (20, 30, 60, 200)
     border = (0, 255, 255) if hovered else (90, 140, 180)
 
-    # průhledná výplň: kreslí se na surface s alfa kanálem
     panel = pygame.Surface(rect.size, pygame.SRCALPHA)
     pygame.draw.rect(panel, fill, panel.get_rect(), border_radius=12)
     screen.blit(panel, rect)
@@ -372,6 +391,17 @@ def draw_button(button):
 
     text = font.render(button["label"], True, (255, 255, 255))
     screen.blit(text, text.get_rect(center=rect.center))
+
+# clickable shop
+back_button = {
+    "label": "BACK",
+    "action": "back",
+    "rect": pygame.Rect(WIDTH // 2 - 100, 492, 200, 44),
+}
+
+
+def shop_row_rect(index):
+    return pygame.Rect(95, 170 + index * 55 - 8, WIDTH - 190, 46)
 
 
 def reset_game():
@@ -415,7 +445,6 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        # klikání myší v menu
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if game_state == "MENU":
                 for button in menu_buttons:
@@ -427,6 +456,20 @@ while running:
                             game_state = "SHOP"
                         elif button["action"] == "quit":
                             running = False
+            elif game_state == "SHOP":
+                if back_button["rect"].collidepoint(event.pos):
+                    game_state = "MENU"
+                else:
+                    for index in range(len(shop_items())):
+                        if shop_row_rect(index).collidepoint(event.pos):
+                            shop_index = index
+                            shop_action(index)
+
+        if event.type == pygame.MOUSEMOTION and game_state =="SHOP":
+            for index in range(len(shop_items())):
+                            if shop_row_rect(index).collidepoint(event.pos):
+                                shop_index = index
+
 
         if event.type == pygame.KEYDOWN:
             if game_state == "MENU":
@@ -486,7 +529,6 @@ while running:
         ) and player_y < HEIGHT - player_size:
             player_y += player_speed
 
-        # Při vyšší rychlosti loď nesmí přejet okraj obrazovky
         player_x = max(0, min(player_x, WIDTH - player_size))
         player_y = max(0, min(player_y, HEIGHT - player_size))
 
