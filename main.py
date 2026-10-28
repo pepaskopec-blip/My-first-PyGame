@@ -6,7 +6,9 @@ import pygame
 
 
 def res(p):
-    return os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))), p)
+    return os.path.join(
+        getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))), p
+    )
 
 
 # Frozen builds can't write next to the bundle (temp dir / read-only .app), so saves go to the home folder.
@@ -325,7 +327,7 @@ def draw_shop():
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 30))
     draw_coins(WIDTH // 2, 100, center=True)
 
-    if pygame.time.get_ticks() > shop_message_until:
+    if pygame.time.get_ticks() < shop_message_until:
         msg = small_font.render(shop_message, True, (255, 215, 0))
         screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 138))
 
@@ -392,6 +394,7 @@ def draw_button(button):
     text = font.render(button["label"], True, (255, 255, 255))
     screen.blit(text, text.get_rect(center=rect.center))
 
+
 # clickable shop
 back_button = {
     "label": "BACK",
@@ -402,6 +405,12 @@ back_button = {
 
 def shop_row_rect(index):
     return pygame.Rect(95, 170 + index * 55 - 8, WIDTH - 190, 46)
+
+
+game_over_buttons = [
+    {"label": "RESTART", "action": "restart", "rect": pygame.Rect(WIDTH // 2 - 270, 395, 260, 50)},
+    {"label": "MENU", "action": "menu", "rect": pygame.Rect(WIDTH // 2 + 10, 395, 260, 50)},
+]
 
 
 def reset_game():
@@ -456,6 +465,7 @@ while running:
                             game_state = "SHOP"
                         elif button["action"] == "quit":
                             running = False
+
             elif game_state == "SHOP":
                 if back_button["rect"].collidepoint(event.pos):
                     game_state = "MENU"
@@ -465,11 +475,19 @@ while running:
                             shop_index = index
                             shop_action(index)
 
-        if event.type == pygame.MOUSEMOTION and game_state =="SHOP":
-            for index in range(len(shop_items())):
-                            if shop_row_rect(index).collidepoint(event.pos):
-                                shop_index = index
+            elif game_state == "GAME_OVER":
+                for button in game_over_buttons:
+                    if button["rect"].collidepoint(event.pos):
+                        if button["action"] == "restart":
+                            reset_game()
+                            game_state = "PLAYING"
+                        elif button["action"] == "menu":
+                            game_state = "MENU"
 
+        if event.type == pygame.MOUSEMOTION and game_state == "SHOP":
+            for index in range(len(shop_items())):
+                if shop_row_rect(index).collidepoint(event.pos):
+                    shop_index = index
 
         if event.type == pygame.KEYDOWN:
             if game_state == "MENU":
@@ -498,7 +516,7 @@ while running:
                 if event.key == pygame.K_r:
                     reset_game()
                     game_state = "PLAYING"
-                elif event.key == pygame.K_m:
+                elif event.key == pygame.K_m or event.key == pygame.K_ESCAPE:
                     game_state = "MENU"
 
     # --- GAME LOGIC ---
@@ -519,13 +537,13 @@ while running:
         if (keys[pygame.K_LEFT] or keys[pygame.K_a]) and player_x > 0:
             player_x -= player_speed
         if (
-                keys[pygame.K_RIGHT] or keys[pygame.K_d]
+            keys[pygame.K_RIGHT] or keys[pygame.K_d]
         ) and player_x < WIDTH - player_size:
             player_x += player_speed
         if (keys[pygame.K_UP] or keys[pygame.K_w]) and player_y > 0:
             player_y -= player_speed
         if (
-                keys[pygame.K_DOWN] or keys[pygame.K_s]
+            keys[pygame.K_DOWN] or keys[pygame.K_s]
         ) and player_y < HEIGHT - player_size:
             player_y += player_speed
 
@@ -757,9 +775,6 @@ while running:
         high_score_text = font.render(
             f"High Score: {highscore}", True, (255, 215, 0)
         )
-        restart_text = font.render(
-            "Press 'R' to Restart | 'M' for Menu", True, (200, 200, 200)
-        )
 
         screen.blit(
             game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, 150)
@@ -770,9 +785,14 @@ while running:
             (WIDTH // 2 - high_score_text.get_width() // 2, 280),
         )
         draw_coins(WIDTH // 2, 320, center=True)
-        screen.blit(
-            restart_text, (WIDTH // 2 - restart_text.get_width() // 2, 380)
+
+        for button in game_over_buttons:
+            draw_button(button)
+
+        hint = small_font.render(
+            "CLICK or R = restart   |   M = menu", True, (200, 200, 200)
         )
+        screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, 552))
 
     pygame.display.flip()
     clock.tick(60)
