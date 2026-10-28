@@ -1,7 +1,25 @@
 import json
+import os
 import random
 import sys
 import pygame
+
+
+def res(p):
+    return os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))), p)
+
+
+# Frozen builds can't write next to the bundle (temp dir / read-only .app), so saves go to the home folder.
+if getattr(sys, "frozen", False):
+    SAVE_DIR = os.path.join(os.path.expanduser("~"), ".space_evader")
+else:
+    SAVE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+
+def save_file(p):
+    return os.path.join(SAVE_DIR, p)
+
 
 pygame.init()
 
@@ -60,22 +78,22 @@ double_timer = 0
 particles = []
 
 # 6. image load
-player_img = pygame.image.load("player.png").convert_alpha()
+player_img = pygame.image.load(res("player.png")).convert_alpha()
 player_img = pygame.transform.scale(player_img, (player_size, player_size))
 
-meteor_img = pygame.image.load("meteor.png").convert_alpha()
+meteor_img = pygame.image.load(res("meteor.png")).convert_alpha()
 meteor_img = pygame.transform.scale(meteor_img, (meteor_size, meteor_size))
 
-life_img = pygame.image.load("life.png").convert_alpha()
+life_img = pygame.image.load(res("life.png")).convert_alpha()
 life_img = pygame.transform.scale(life_img, (25, 25))
 
-coin_img = pygame.image.load("coin.png").convert_alpha()
+coin_img = pygame.image.load(res("coin.png")).convert_alpha()
 coin_img = pygame.transform.scale(coin_img, (25, 25))
 
-default_background = pygame.image.load("default_background.jpg").convert()
+default_background = pygame.image.load(res("default_background.jpg")).convert()
 bg_img = pygame.transform.scale(default_background, (WIDTH, HEIGHT))
 
-enemy_spaceship_img = pygame.image.load("enemy_spaceship.png").convert_alpha()
+enemy_spaceship_img = pygame.image.load(res("enemy_spaceship.png")).convert_alpha()
 enemy_spaceship_img = pygame.transform.scale(
     enemy_spaceship_img, (enemy_size, enemy_size)
 )
@@ -87,7 +105,7 @@ SKINS = [
     {"name": "Skin 3", "file": "player_skin3.png", "price": 100},
 ]
 for skin in SKINS:
-    skin_img = pygame.image.load(skin["file"]).convert_alpha()
+    skin_img = pygame.image.load(res(skin["file"])).convert_alpha()
     skin["img"] = pygame.transform.scale(skin_img, (player_size, player_size))
     skin["icon"] = pygame.transform.scale(skin_img, (30, 30))
 
@@ -108,7 +126,7 @@ title_font = pygame.font.SysFont("Arial", 50, bold=True)
 # 8. high score
 score = 0
 try:
-    with open("highscore.txt", "r") as file:
+    with open(save_file("highscore.txt"), "r") as file:
         highscore = int(file.read())
 except (FileNotFoundError, ValueError):
     highscore = 0
@@ -116,7 +134,7 @@ except (FileNotFoundError, ValueError):
 # coins
 coins = 0
 try:
-    with open("coins.txt", "r") as file:
+    with open(save_file("coins.txt"), "r") as file:
         coins = int(file.read())
 except (FileNotFoundError, ValueError):
     coins = 0
@@ -128,7 +146,7 @@ shop = {
     "upgrades": {"lives": 0, "speed": 0, "duration": 0},
 }
 try:
-    with open("shop.json", "r") as file:
+    with open(save_file("shop.json"), "r") as file:
         shop.update(json.load(file))
 except (FileNotFoundError, ValueError):
     pass
@@ -141,17 +159,17 @@ shop_index = 0
 
 
 def save_highscore(val):
-    with open("highscore.txt", "w") as file:
+    with open(save_file("highscore.txt"), "w") as file:
         file.write(str(val))
 
 
 def save_coins(val):
-    with open("coins.txt", "w") as file:
+    with open(save_file("coins.txt"), "w") as file:
         file.write(str(val))
 
 
 def save_shop():
-    with open("shop.json", "w") as file:
+    with open(save_file("shop.json"), "w") as file:
         json.dump(shop, file)
 
 

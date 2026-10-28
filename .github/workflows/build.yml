@@ -20,7 +20,7 @@ jobs:
             asset_name: dist/SpaceEvader-macOS.zip
             command: |
               pyinstaller --noconsole --collect-all pygame --add-data "*.png:." --add-data "*.jpg:." --name "SpaceEvader-macOS" main.py
-              cd dist && zip -r SpaceEvader-macOS.zip main.app || zip -r SpaceEvader-macOS.zip SpaceEvader-macOS
+              cd dist && ditto -c -k --keepParent SpaceEvader-macOS.app SpaceEvader-macOS.zip
 
           - os: ubuntu-latest
             asset_name: dist/SpaceEvader-Linux.tar.gz
@@ -45,10 +45,16 @@ jobs:
       - name: Build Executable
         run: ${{ matrix.command }}
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}
+          path: ${{ matrix.asset_name }}
+
       - name: Upload Asset to Release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
           files: ${{ matrix.asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
