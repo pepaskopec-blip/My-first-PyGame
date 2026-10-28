@@ -50,6 +50,18 @@ enemy_speed_x = 3
 enemy_alive = True
 enemy_respawn_timer = 0
 
+# boss variables
+boss_size = 90
+boss_x = WIDTH // 2 - boss_size // 2
+boss_y = 40
+boss_speed_x = 3
+boss_hp = 100
+boss_max_hp = 100
+boss_alive = False
+boss_shoot_timer = 0
+boss_phase = 1
+next_boss_score = 100
+
 # 5. LASERS
 lasers = []
 laser_speed = 10
@@ -98,6 +110,11 @@ bg_img = pygame.transform.scale(default_background, (WIDTH, HEIGHT))
 enemy_spaceship_img = pygame.image.load(res("enemy_spaceship.png")).convert_alpha()
 enemy_spaceship_img = pygame.transform.scale(
     enemy_spaceship_img, (enemy_size, enemy_size)
+)
+
+boss_img = pygame.image.load(res("boss.png")).convert_alpha()
+boss_img = pygame.transform.scale(
+    boss_img, (boss_size, boss_size)
 )
 
 # ===== SHOP DATA =====
@@ -418,6 +435,7 @@ def reset_game():
     global enemy_x, enemy_alive, enemy_respawn_timer, enemy_shoot_timer, powerups
     global particles, shield_timer, rapid_timer, double_timer, shoot_cooldown
     global player_speed, player_img
+    global boss_alive, boss_hp, boss_max_hp, boss_x, boss_shoot_timer, next_boss_score, boss_phase
 
     player_x = 375
     player_y = 500
@@ -427,6 +445,15 @@ def reset_game():
     enemy_alive = True
     enemy_respawn_timer = 0
     enemy_shoot_timer = 0
+
+    boss_alive = False
+    boss_hp = 100
+    boss_max_hp = 100
+    boss_x = WIDTH // 2 - boss_size // 2
+    boss_shoot_timer = 0
+    boss_speed_x = 3
+    next_boss_score = 100
+    boss_phase = 1
 
     meteor_speed = 4
     score = 0
@@ -555,6 +582,15 @@ while running:
         if score > highscore:
             highscore = score
 
+        # Check Boss Spawn
+        if not boss_alive and score >= next_boss_score:
+            boss_alive = True
+            boss_hp = 100 + (score // 100) * 40
+            boss_max_hp = boss_hp
+            boss_phase = 1
+            boss_speed_x = 3
+            boss_x = WIDTH // 2 - boss_size // 2
+
         # Effect timers
         if shield_timer > 0:
             shield_timer -= 1
@@ -581,8 +617,48 @@ while running:
                 apply_powerup(p_up["type"])
                 powerups.remove(p_up)
 
-        # Enemy
-        if enemy_alive:
+        # BOSS LOGIC
+        if boss_alive:
+            hp_percentage =  boss_hp / boss_max_hp
+
+            if hp_percentage > 0.6:
+                boss_phase = 1
+            elif hp_percentage > 0.25:
+                boss_phase = 2
+            else:
+                boss_phase = 3
+
+            if boss_phase == 1:
+                current_speed = 3
+            elif boss_phase == 2:
+                current_speed = 5
+            else:
+                current_speed = 8
+
+            boss_x += current_speed if boss_speed_x > 0 else -current_speed
+            if boss_x <= 0 or boss_x >= WIDTH - boss_size:
+                boss_speed_x *= -1
+
+            boss_shoot_timer += 1
+
+            if boss_phase == 1 and boss_shoot_timer >= 45:
+                boss_shoot_timer = 0
+                enemy_lasers.append(pygame.Rect(boss_x + 15, boss_y + boss_size, 6, 18))
+                enemy_lasers.append(pygame.Rect(boss_x + boss_size - 21, boss_y + boss_size, 6, 18))
+
+            elif boss_phase == 2 and boss_shoot_timer >= 30:
+                boss_shoot_timer = 0
+                enemy_lasers.append(pygame.Rect(boss_x + 10, boss_y + boss_size, 6, 18))
+                enemy_lasers.append(pygame.Rect(boss_x + boss_size // 2 - 3, boss_y + boss_size, 6, 18))
+                enemy_lasers.append(pygame.Rect(boss_x + boss_size - 16, boss_y + boss_size, 6, 18))
+
+            elif boss_phase == 3 and boss_shoot_timer >= 12:
+                boss_shoot_timer = 0
+                shot_x = random.randint(boss_x + 10, boss_x + boss_size - 15)
+                enemy_lasers.append(pygame.Rect(shot_x, boss_y + boss_size, 7, 20))
+
+        # Regular Enemy Logic
+        elif enemy_alive:
             enemy_x += enemy_speed_x
             if enemy_x <= 0 or enemy_x >= WIDTH - enemy_size:
                 enemy_speed_x *= -1
@@ -629,8 +705,36 @@ while running:
                 lasers.remove(laser)
                 continue
 
+            # Boss hit
+            if boss_alive:
+                boss_rect = pygame.Rect(boss_x, boss_y, boss_size, boss_size)
+                if laser.colliderect(boss_rect):
+                    boss_hp -= 1
+                    create_explosion(laser.x, laser.y, (255, 200, 0))
+                    lasers.remove(laser)
+                    if boss_hp <= 0:
+                        boss_alive = False
+                        score += 50
+                        coins += 20 * coin_mult
+                        next_boss_score = score + 100
+                        create_explosion(
+                            boss_x + boss_size // 2,
+                            boss_y + boss_size // 2,
+                            (255, 50, 0),
+                        )
+                        # Drop powerup
+                        powerups.append(
+                            {
+                                "rect": pygame.Rect(
+                                    boss_x + boss_size // 2, boss_y + 30, 25, 25
+                                ),
+                                "type": random.choice(POWERUP_TYPES),
+                            }
+                        )
+                    continue
+
             # Enemy hit
-            if enemy_alive:
+            if enemy_alive and not boss_alive:
                 enemy_rect = pygame.Rect(
                     enemy_x, enemy_y, enemy_size, enemy_size
                 )
@@ -721,7 +825,31 @@ while running:
         for meteor in meteors:
             screen.blit(meteor_img, meteor)
 
-        if enemy_alive:
+        if boss_alive:
+            screen.blit(boss_img, (boss_x, boss_y))
+
+            # Boss Health Bar
+            bar_w = 300
+            bar_h = 18
+            bar_x = WIDTH // 2 - bar_w // 2
+            bar_y = 15
+            fill_w = max(0, int((boss_hp / boss_max_hp) * bar_w))
+
+            if boss_phase == 1:
+                bar_color = (255, 50, 50)
+            elif boss_phase == 2:
+                bar_color = (255, 140, 0)
+            else:
+                bar_color = (200, 0, 255)
+
+            pygame.draw.rect(screen, (50, 0, 0), (bar_x, bar_y, bar_w, bar_h))
+            pygame.draw.rect(screen, bar_color, (bar_x, bar_y, fill_w, bar_h))
+            pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2)
+
+            b_label = small_font.render("BOSS", True, (255, 255, 255))
+            screen.blit(b_label, (WIDTH // 2 - b_label.get_width() // 2, bar_y + 18))
+
+        elif enemy_alive:
             screen.blit(enemy_spaceship_img, (enemy_x, enemy_y))
 
         for e_laser in enemy_lasers:
