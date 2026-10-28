@@ -40,7 +40,7 @@ Active effects and their remaining time are shown under the coin counter.
 
 ## 🛒 Shop
 
-Press `S` in the main menu to open the shop. Spend your coins on:
+Open "Shop" in main menu and spend your coins on:
 
 ### Ship skins
 
@@ -131,8 +131,6 @@ Save files (`highscore.txt`, `coins.txt` and `shop.json`) are created automatica
 
 | Key | Action |
 | --- | --- |
-| `Space` / `Enter` | Start the game (main menu) |
-| `S` | Open the shop (main menu) |
 | `Up Arrow` / `Down Arrow` | Select an item (shop) |
 | `Enter` | Buy or equip the selected item (shop) |
 | `Esc` | Back to the main menu (shop) |
